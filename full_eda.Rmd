@@ -1,0 +1,156 @@
+---
+title: 'JHU - Exploratory Data Analysis, Assignment #2'
+author: "jnabonne"
+---
+
+```{r global_settings, echo=F}
+	library(knitr)
+	opts_chunk$set(cache=F, warning=0, message=0, echo=0)
+	library(dplyr)
+	library(ggplot2)
+```
+
+# JHU - Exploratory Data Analysis, Assignment #2
+
+## About
+This script contains R code to generate plots asked in the [assignment #2 of eda course](https://www.coursera.org/learn/exploratory-data-analysis/peer/b5Ecl/course-project-2)
+
+## Dataset
+The dataset for this exercice available [here](https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2FNEI_data.zip)
+
+## Notes:  
+* one R script per question (6 in total)
+* some scripts use libraries as ggplot2 and dplyr but wont install them (IMHO, a script should not)
+* scripts start by downloading and unzip dataset each time (to always get last version in case it changes)
+
+
+```{r setup, echo=F, message=F, warning=F}
+	# downloading dataset (each time to get its latest version)
+	file_url <- "https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2FNEI_data.zip"
+	file_path <- "NEI_data.zip"
+	download.file(file_url, destfile=file_path, method="curl")
+	unzip(file_path)
+	# reading (and unzipping on-the-fly) dataset's 2 files
+	nei <- readRDS("summarySCC_PM25.rds")
+	scc <- readRDS("Source_Classification_Code.rds")
+```
+
+---
+
+## Q1. Have total emissions from PM2.5 decreased in US from 1999 to 2008?
+```{r plot1}
+	# summing emissions per years
+	tot1 <- tapply(nei$Emissions, nei$year, sum)
+	# building plot
+	plot(names(tot1), tot1, type='b',
+	     xlab="year", ylab="emissions (tons)",
+	     main="Total emissions of PM2.5 in the US")
+```
+
+=> YES, globally (taking into account all type of sources), PM2.5 emissions have decreased over the 1999-2008 period
+
+---
+
+## Q2. Have total emissions from PM2.5 decreased in the Baltimore City?
+
+```{r plot2}
+		# filtering data for Baltimore City
+	nei_baltimore <- subset(nei, nei$fips=="24510")
+	# summimg emissions per years
+	tot2 <- tapply(nei_baltimore$Emissions, nei_baltimore$year, sum)
+	# building plot
+	plot(names(tot2), tot2, type='b',
+	     xlab="year", ylab="emissions (tons)",
+	     main="Total emissions of PM2.5 in Baltimore City")
+```
+
+=> Over the global period, YES, emissions have decreased in Baltimore  
+but we can also note that there was a clear increase between 2002 and 2005
+
+---
+
+# Q3. Which of 4 types of sources emission have decreased for Baltimore City?
+```{r plot3}
+	# summing after filtering for Baltimore and grouping by year and sources types
+	tot3 <- nei %>% 
+	  filter(fips=="24510") %>% 
+	  group_by(year, type) %>% 
+	  summarize(total=sum(Emissions))
+	# building plot
+	qplot(data=tot3, year, total, col=type, geom="path",
+		ylab="emissions (tons)",
+		main="Total emissions of PM2.5 in Baltimore City per type of sources")
+```
+
+=> POINT type of source is the only one that clearly increased during the 1999-2008 period
+even if we can witness a change in the tendance since 2005.  
+If NON-ROAD type registered a small increase between 2002 and 2005, 
+all other types have decreased over the global period
+
+---
+
+# Q4. Across US, how emissions from coal combustion-related sources changed?
+```{r plot 4}
+	# getting idx and value of SCC codes for coal related sources
+	idx_coal <- grepl("coal", scc$Short.Name, ignore.case=1)
+	coal_scc <- scc[idx_coal,]$SCC	
+	# filtering by coal scc codes and grouping by year
+	tot4 <- nei %>% 
+	  filter(SCC %in% coal_scc) %>% 
+	  group_by(year) %>% 
+	  summarize(total=sum(Emissions))
+	# building plot
+	qplot(data=tot4, year, total, geom="path", ylab="emissions (tons)",
+	  main="US PM2.5 total emissions for coal combustion-related sources")
+```
+
+=> they have been decreasing except between 2002 and 2005 but have dramatically dropped since 2005
+
+---
+
+# Q5. How emissions from motor vehicle sources changed in Baltimore?
+```{r plot 5}
+	# getting idx and value of SCC codes for motor vehicule sources
+	# (assuming that all vehicule source are motorized)
+	idx_motor <- grepl("vehicle", scc$Short.Name, ignore.case=1)
+	motor_scc <- scc[idx_motor,]$SCC
+	# filtering by motor SCC codes, Baltimore and grouping by year
+	tot5 <- nei %>% 
+	# filter(SCC %in% motor_scc & fips=="24510" & type=="ON-ROAD") %>% 
+	  filter(SCC %in% motor_scc & fips=="24510") %>% 
+	  group_by(year) %>% 
+	  summarize(total=sum(Emissions))
+	# building plot
+	qplot(data=tot5, year, total, geom="path", ylab="emissions (tons)",
+	  main="PM2.5 total emissions for motor vehicules sources in Baltimore")
+```
+
+=> they have continuously decrease over the years (especially between 1999 and 2002)
+
+---
+
+# Q6. Compare motor vehicle emisions in Baltimore City and Los Angeles County
+```{r plot 6}
+	# getting idx and value of SCC codes for coal related sources
+	idx_motor <- grepl("motor", scc$Short.Name, ignore.case=1)
+	motor_scc <- scc[idx_motor,]$SCC	
+	# filtering by motor scc codes and fips corresponding to Baltimore & LA County
+	tot6 <- nei %>% 
+	  filter(SCC %in% motor_scc & (fips=="24510" | fips=="06037")) %>% 
+	  group_by(year, fips) %>% 
+	  summarize(total=sum(Emissions))
+	# building plot (but does not display it yet)
+	p6 <- qplot(data=tot6, year, total, color=fips, geom="path",
+	           ylab="emissions (tons)",
+	           main="PM2.5 total emissions for motor vehicules sources")
+	# printing plot while modifying legend on-the-fly
+	print(p6 + scale_colour_hue(name="Location", breaks=c("06037", "24510"),
+	                     labels=c("LA County", "Baltimore City")))
+```
+
+=> LA County sadly registers an increase in PM2.5 emissions and measures are much higher than in Baltimore  
+(which has seen an increase in first years of 21th century but get back to its previous values of 1999)
+
+---
+
+This is the end, thanks for reading until it!
