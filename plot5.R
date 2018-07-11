@@ -5,18 +5,19 @@ library(dplyr)
 # downloading dataset (each time to get its latest version)
 file_url <- "https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2FNEI_data.zip"
 file_path <- "NEI_data.zip"
-#download.file(file_url, destfile=file_path, method="curl")
-#unzip(file_path)
+download.file(file_url, destfile=file_path, method="curl")
+unzip(file_path)
 
 # reading (and unzipping on-the-fly) dataset's 2 files
 nei <- readRDS("summarySCC_PM25.rds")
 scc <- readRDS("Source_Classification_Code.rds")
 
-# getting idx and value of SCC codes for coal related sources
-idx_motor <- grepl("motor", scc$Short.Name, ignore.case=1)
+# getting idx and value of SCC codes for motor vehicule sources
+# (assuming that all vehicule source are motorized)
+idx_motor <- grepl("vehicle", scc$Short.Name, ignore.case=1)
 motor_scc <- scc[idx_motor,]$SCC
 
-# filtering by coal scc codes and grouping by year
+# filtering by motor SCC codes, Baltimore and grouping by year
 tot5 <- nei %>% 
 # filter(SCC %in% motor_scc & fips=="24510" & type=="ON-ROAD") %>% 
   filter(SCC %in% motor_scc & fips=="24510") %>% 
